@@ -1,7 +1,12 @@
 #!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 2; -*-
+# vim: et sts=2 sw=2
+#
+# Your original comment header...
+
 set -eu
 
-# --- Select Drive Function ---
+# --- Replace your original disk prompt with this ---
 select_target_disk() {
   echo "Scanning for available disks..."
   mapfile -t disks < <(lsblk -dno NAME,SIZE,TYPE | grep "disk" | sort)
@@ -26,7 +31,6 @@ select_target_disk() {
       read -rp "Are you sure you want to install SteamOS on this drive? Type YES to confirm: " confirm
       if [[ "$confirm" == "YES" ]]; then
         DISK="/dev/$name"
-        # Determine suffix for nvme
         if [[ "$DISK" =~ "nvme" ]]; then
           DISK_SUFFIX="p"
         else
@@ -43,11 +47,11 @@ select_target_disk() {
   done
 }
 
-# Run disk selection
+# Call the disk selection early
 select_target_disk
 echo "Using disk: $DISK"
 
-# Set partition labels
+# Set partition labels and IDs
 readvar PARTITION_TABLE <<END
   label: gpt
   ${DISK}${DISK_SUFFIX}1: name="esp", size=64MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
@@ -70,7 +74,7 @@ FS_VAR_A=6
 FS_VAR_B=7
 FS_HOME=8
 
-# Utility functions
+# Utils
 err() { echo >&2 "$@"; sleep infinity; exit 1; }
 trap 'err "Unexpected error."' ERR
 
@@ -82,7 +86,7 @@ showcmd() { echo "+ $*"; "$@"; }
 fmt_ext4() { sudo mkfs.ext4 -F -L "$1" "$2"; }
 fmt_fat32() { sudo mkfs.vfat -n "$1" "$2"; }
 
-# Prompt functions
+# Prompt mechanics
 prompt_step() {
   echo "$@"
   if [[ -n ${NOPROMPT:-} ]]; then
@@ -117,10 +121,10 @@ finalize_part() {
   # Placeholder for actual finalize commands
 }
 
-# --- Main sequence ---
+# --- Main ---
 main() {
   # Check disk exists
-  [[ -e "$DISK" ]] || err "Disk $DISK not found."
+  [[ -e "$DISK" ]] || err "$DISK does not exist -- no drive detected?"
 
   # Write partition table
   prompt_step "Reinstall or Repair" "This will erase and install SteamOS on $DISK. Are you sure?"
@@ -141,7 +145,7 @@ main() {
   imageroot "$root_dev" "$(diskpart "$FS_ROOT_A")"
   imageroot "$root_dev" "$(diskpart "$FS_ROOT_B")"
 
-  # Run latest SteamOS update
+  # Run latest SteamOS update and check
   echo "Checking for latest SteamOS updates..."
   output=$(steamos-update --no-reboot)
   echo "$output"
@@ -155,12 +159,9 @@ main() {
   finalize_part "A"
   finalize_part "B"
   echo "Installation complete. Rebooting..."
-  reboot
+  systemctl reboot
 }
 
 # Run main
 main
 }
-
-# Run the script
-main "$@"
